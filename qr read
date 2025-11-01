@@ -1,0 +1,71 @@
+#include <SoftwareSerial.h>
+
+SoftwareSerial qrScanner(2, 3);   // RX, TX for QR Scanner
+SoftwareSerial gsm(10, 11);       // RX, TX for GSM Module
+
+String product;
+float total = 0.0;
+
+// Example product database (you can expand this)
+struct Product {
+  String code;
+  String name;
+  float price;
+};
+
+Product products[] = {
+  {"QR001", "Soap", 40.00},
+  {"QR002", "Shampoo", 120.50},
+  {"QR003", "Toothpaste", 60.00}
+};
+
+void setup() {
+  Serial.begin(9600);
+  qrScanner.begin(9600);
+  gsm.begin(9600);
+  Serial.println("Automatic Bill System Ready...");
+  sendSMS("System started successfully!");
+}
+
+void loop() {
+  if (qrScanner.available()) {
+    product = qrScanner.readStringUntil('\n');
+    product.trim();
+    Serial.println("Scanned Code: " + product);
+    addProductToBill(product);
+  }
+}
+
+void addProductToBill(String code) {
+  bool found = false;
+  for (int i = 0; i < sizeof(products) / sizeof(products[0]); i++) {
+    if (products[i].code == code) {
+      total += products[i].price;
+      Serial.println("Added: " + products[i].name + " - Rs " + String(products[i].price));
+      found = true;
+      break;
+    }
+  }
+  
+  if (!found) {
+    Serial.println("Unknown product!");
+  }
+
+  // Optional: After all items scanned, send bill
+  if (total > 0) {
+    String msg = "Your total bill is Rs " + String(total, 2);
+    sendSMS(msg);
+  }
+}
+
+void sendSMS(String text) {
+  gsm.println("AT+CMGF=1");  // Text mode
+  delay(1000);
+  gsm.println("AT+CMGS=\"+91XXXXXXXXXX\"");  // Replace with customer number
+  delay(1000);
+  gsm.println(text);
+  delay(1000);
+  gsm.write(26);  // CTRL+Z to send
+  delay(2000);
+  Serial.println("SMS Sent: " + text);
+}
